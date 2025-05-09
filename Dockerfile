@@ -9,22 +9,23 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd gcc libpq-dev && \
     apt-get clean
 
-# Copy dependencies
+# Copy requirements.txt first to leverage Docker caching
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
+# Copy project files (this includes server.py and other relevant files)
 COPY . .
 
-ENV DJANGO_SETTINGS_MODULE=fileuploader.settings
+# Expose port 8000 for FastAPI
+EXPOSE 8000
 
-# Create required dirs
-RUN mkdir -p /app/static /app/media
+# Set environment variables (optional if needed for your application)
+# ENV REDIS_HOST=localhost
+# ENV REDIS_PORT=6379
+# ENV REDIS_DB=0
+# ENV LOG_LEVEL=INFO
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
-# Default command to run Gunicorn server
-CMD ["gunicorn", "fileuploader.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Default command to run FastAPI server
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+SERVER_IP = os.getenv('SERVER_IP', 'localhost')
 REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
 REDIS_DB = int(os.getenv('REDIS_DB', 0))
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -23,7 +23,7 @@ NUM_CORES = os.cpu_count()
 HALF_CORES = max(1, NUM_CORES // 2)
 MAX_WAIT_SECONDS = 60
 
-redis_client = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+redis_client = redis.StrictRedis(host=SERVER_IP, port=REDIS_PORT, db=REDIS_DB)
 
 # === LOGGER SETUP ===
 logger = logging.getLogger("simulate_device_logger")
@@ -90,8 +90,8 @@ def connect_and_store_socket(port, protocol):
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(3)
-        s.connect(("127.0.0.1", port))
-        logger.info(f"🔗 Connected to 127.0.0.1:{port} ({protocol})")
+        s.connect((SERVER_IP, port))
+        logger.info(f"🔗 Connected to {SERVER_IP}:{port} ({protocol})")
         return s
     except Exception as e:
         logger.error(f"❌ Connection failed to port {port} ({protocol}): {e}")
