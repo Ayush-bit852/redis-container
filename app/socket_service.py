@@ -1,6 +1,6 @@
 import asyncio
 
-from .logger import logging, configure_logging
+from logger import logging, configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)

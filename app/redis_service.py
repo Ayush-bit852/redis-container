@@ -1,8 +1,8 @@
 import aioredis
 from fastapi import Depends
 
-from .config import Settings, get_settings
-from .logger import logging, configure_logging
+from config import Settings, get_settings
+from logger import logging, configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)

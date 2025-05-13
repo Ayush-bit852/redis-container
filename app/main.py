@@ -1,12 +1,14 @@
+import asyncio
 import json
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, BackgroundTasks
 
-from .config import get_settings, Settings
-from .logger import configure_logging
-from .parser import LogParser
-from .processor import LogProcessor
-from .redis_service import RedisService
+from file_watcher import FileWatcher
+from config import get_settings, Settings
+from logger import configure_logging
+from parser import LogParser
+from processor import LogProcessor
+from redis_service import RedisService
 
 app = FastAPI()
 configure_logging()
@@ -23,6 +25,17 @@ async def startup_event():
     processor = LogProcessor(settings)
     await processor.setup()
     app.state.processor = processor
+
+    # Start FTP monitor if configured
+    from ftp_service import ftp_monitor
+    app.add_event_handler("startup", lambda: asyncio.create_task(ftp_monitor(settings)))
+
+
+    watcher = FileWatcher(settings)
+    await watcher.setup()
+    app.state.watcher = watcher
+    # launch watcher in background
+    asyncio.create_task(watcher.watch())
 
 @app.on_event("shutdown")
 async def shutdown_event():
