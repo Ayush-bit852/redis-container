@@ -1,31 +1,18 @@
-# Dockerfile
-FROM python:3.11-slim
+FROM python:3.11-slim AS build
 
-# Set working directory
 WORKDIR /app
+COPY pyproject.toml poetry.lock ./
+RUN pip install poetry \
+ && poetry config virtualenvs.create false \
+ && poetry install --no-dev --no-root
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    netcat-openbsd gcc libpq-dev && \
-    apt-get clean
-
-# Copy requirements.txt first to leverage Docker caching
-COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy project files (this includes server.py and other relevant files)
+FROM python:3.11-slim
+WORKDIR /app
+COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY . .
 
-# Expose port 8000 for FastAPI
+RUN adduser --disabled-password appuser
+USER appuser
+
 EXPOSE 8000
-
-# Set environment variables (optional if needed for your application)
-# ENV REDIS_HOST=localhost
-# ENV REDIS_PORT=6379
-# ENV REDIS_DB=0
-# ENV LOG_LEVEL=INFO
-
-# Default command to run FastAPI server
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

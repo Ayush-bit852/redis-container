@@ -4,17 +4,17 @@ services:
   web:
     build: .
     container_name: fastapi_app
-    command: uvicorn server:app --host 0.0.0.0 --port 8000
-    volumes:
-      - .:/app
-      - ./media:/app/media
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     depends_on:
-      - redis
-    env_file:
-      - .env
-    restart: always
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   redis:
     image: redis:7
@@ -23,7 +23,16 @@ services:
       - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  redis-insight:
+    image: redis/redisinsight:latest
     restart: always
+    ports:
+      - "5540:5540"
 
 volumes:
   redis_data:
