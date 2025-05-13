@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import List
 from pydantic import BaseModel, Field
-from logger import configure_logging, logging
+from app.logger import configure_logging, logging
 
 configure_logging()
 logger = logging.getLogger(__name__)

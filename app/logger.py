@@ -1,5 +1,5 @@
 import logging.config
-from config import get_settings
+from app.config import get_settings
 
 def configure_logging():
     cfg = get_settings()

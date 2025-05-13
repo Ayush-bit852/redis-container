@@ -2,10 +2,10 @@ import asyncio
 from ftplib import FTP, error_perm
 import tempfile
 import os
-from logger import logging, configure_logging
-from parser import LogParser
-from redis_service import RedisService
-from config import Settings
+from app.logger import logging, configure_logging
+from app.parser import LogParser
+from app.redis_service import RedisService
+from app.config import Settings
 
 configure_logging()
 logger = logging.getLogger(__name__)

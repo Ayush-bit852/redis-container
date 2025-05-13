@@ -2,9 +2,9 @@ import asyncio
 import logging
 from pathlib import Path
 
-from config import Settings
-from parser import LogParser
-from redis_service import RedisService
+from app.config import Settings
+from app.parser import LogParser
+from app.redis_service import RedisService
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class FileWatcher:
         await self.redis_svc.connect()
 
     async def watch(self):
-        print(self)
+        logger.info(self)
         while True:
             for file in self.dir.glob("*.log"):
                 if file in self.seen:

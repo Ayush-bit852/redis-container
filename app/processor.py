@@ -1,8 +1,8 @@
 import json
 
-from logger import logging, configure_logging
-from redis_service import RedisService
-from socket_service import SocketService
+from app.logger import logging, configure_logging
+from app.redis_service import RedisService
+from app.socket_service import SocketService
 
 configure_logging()
 logger = logging.getLogger(__name__)

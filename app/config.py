@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ftp_password: str = ""
     ftp_remote_dir: str = "/logs"
     ftp_poll_interval: int = 60  # in seconds
+    watch_dir: str = "./logs"
+    watch_poll_interval: int = 5
 
     class Config:
         env_file = ".env"
