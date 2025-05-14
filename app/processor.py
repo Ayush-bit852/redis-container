@@ -1,6 +1,7 @@
 import json
+import asyncio
 
-from app.logger import logging, configure_logging
+from app.logger import configure_logging, logging
 from app.redis_service import RedisService
 from app.socket_service import SocketService
 
@@ -11,26 +12,39 @@ class LogProcessor:
     def __init__(self, settings):
         self.settings = settings
         self.redis = RedisService(settings)
-        self.sockets = {}  # session -> (reader, writer)
         self.socket_svc = SocketService(settings)
+        self.sockets = {}  # session -> (reader, writer)
 
     async def setup(self):
         await self.redis.connect()
 
     async def process(self, PORT_MAP: dict):
-        keys = await self.redis.keys()
+        try:
+            keys = await self.redis.keys()
+        except Exception:
+            logger.warning("Redis keys() failed, reconnecting…")
+            await self.redis.connect()
+            keys = await self.redis.keys()
+
+        logger.info(f"Processing {len(keys)} session queue(s)")
         if len(keys) < self.settings.min_sessions:
-            logger.warning("Fewer sessions than minimum, continuing anyway")
+            logger.warning("Fewer sessions than threshold, proceeding anyway")
 
         for key in keys:
             session = key.split(":", 1)[1]
-            data = await self.redis.fetch_all(key)
+            try:
+                data = await self.redis.fetch_all(key)
+            except Exception:
+                logger.warning(f"Redis fetch_all({key}) failed, reconnecting…")
+                await self.redis.connect()
+                data = await self.redis.fetch_all(key)
+
             if not data:
                 continue
 
             first = json.loads(data[0])
             port = int(first["port"])
-            protocol = PORT_MAP.get(str(port), "unknown")
+            proto = PORT_MAP.get(str(port), "unknown")
 
             reader, writer = self.sockets.get(session, (None, None))
             if writer is None:
@@ -45,15 +59,26 @@ class LogProcessor:
                     msg = json.loads(raw)
                     writer.write(bytes.fromhex(msg["hex"]))
                     await writer.drain()
-                    logger.info(f"Sent HEX to {port} ({protocol}) for session {session}")
+                    logger.info(f"Sent HEX to {port} ({proto}) for session {session}")
                 except Exception as e:
-                    logger.error(f"Send error for session {session}: {e}")
+                    logger.error(f"Error sending to socket for session {session}: {e}")
+                    # try reconnecting that socket once
+                    r2, w2 = await self.socket_svc.connect(port)
+                    if w2:
+                        writer = w2
+                        self.sockets[session] = (r2, w2)
+                        writer.write(bytes.fromhex(msg["hex"]))
+                        await writer.drain()
+                        logger.info(f"Re-sent HEX after reconnect to {port} for session {session}")
                     break
 
             await self.redis.delete(key)
 
-        # close sockets
-        for reader, writer in self.sockets.values():
-            writer.close()
-            await writer.wait_closed()
-        logger.info("Processing complete, all sockets closed")
+        # close all sockets
+        for rdr, wtr in self.sockets.values():
+            try:
+                wtr.close()
+                await wtr.wait_closed()
+            except Exception:
+                pass
+        logger.info("All sockets closed, processing complete")

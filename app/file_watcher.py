@@ -15,28 +15,28 @@ class FileWatcher:
         self.poll_interval = settings.watch_poll_interval
         self.redis_svc = RedisService(settings)
         self.parser = LogParser()
-        # Keep track of processed files
         self.seen = set()
 
     async def setup(self):
-        # Ensure watch directory exists
         if not self.dir.exists():
             self.dir.mkdir(parents=True)
+            logger.info(f"Created watch directory: {self.dir}")
         await self.redis_svc.connect()
 
     async def watch(self):
-        logger.info(self)
+        logger.info(f"Starting file watcher on {self.dir}")
         while True:
             for file in self.dir.glob("*.log"):
                 if file in self.seen:
                     continue
                 self.seen.add(file)
-                try:
-                    text = file.read_text()
-                    entries = self.parser.parse(text)
-                    for e in entries:
-                        await self.redis_svc.push(e.session, e)
-                    logger.info(f"Queued {len(entries)} entries from {file.name}")
-                except Exception as e:
-                    logger.error(f"Error processing file {file}: {e}")
+
+                text = file.read_text()
+                entries = self.parser.parse(text)
+
+                for e in entries:
+                    # each push will auto-reconnect if needed
+                    await self.redis_svc.push(e.session, e)
+                logger.info(f"Queued {len(entries)} entries from file {file.name}")
+
             await asyncio.sleep(self.poll_interval)

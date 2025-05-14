@@ -1,9 +1,11 @@
 import re
 from datetime import datetime
 from typing import List
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
 from app.logger import configure_logging, logging
 
+# ensure logging is configured
 configure_logging()
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,7 @@ class LogParser:
     )
 
     def parse(self, text: str) -> List[LogEntry]:
-        results = []
+        results: List[LogEntry] = []
         for line in text.splitlines():
             m = self._matcher.match(line.strip())
             if not m:
@@ -34,5 +36,5 @@ class LogParser:
                 results.append(LogEntry(**data))
             except Exception:
                 logger.warning("Skipping invalid line: %r", line)
-        logger.info("Parsed %d entries", len(results))
+        logger.info(f"Parsed {len(results)} entries")
         return results
