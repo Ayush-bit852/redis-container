@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-from app.config import get_settings
 from app.logger import configure_logging
 
 configure_logging()
@@ -16,11 +15,11 @@ class SocketService:
         for attempt in range(1, self._settings.socket_retries + 1):
             try:
                 reader, writer = await asyncio.open_connection(self.host, port)
-                logger.info(f"Socket connected → {self.host}:{port} on attempt {attempt}")
+                logger.info(f"Socket connected → {self.host}:{port} (attempt {attempt})")
                 return reader, writer
             except Exception as e:
                 logger.error(f"Socket connect attempt {attempt} to {self.host}:{port} failed: {e}")
                 if attempt < self._settings.socket_retries:
                     await asyncio.sleep(self._settings.socket_backoff)
-        logger.error(f"Failed to connect socket to {self.host}:{port} after {self._settings.socket_retries} attempts")
+        logger.error(f"Socket ultimately failed to {self.host}:{port}")
         return None, None

@@ -2,7 +2,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 
 from app.file_watcher import FileWatcher
 from app.config import get_settings, Settings
@@ -14,35 +14,36 @@ from app.ftp_service import ftp_monitor
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Configure logging early
     configure_logging()
     logger = logging.getLogger(__name__)
-    logger.info("Application startup…")
+    logger.info("Starting application…")
 
-    # Load protocol map
+    # Load protocol‐to‐port map
     protocol_map = json.load(open("protocol_ports.json"))
     app.state.PORT_MAP = protocol_map
-    logger.debug(f"Protocol map: {protocol_map}")
+    logger.debug(f"Protocol map loaded: {protocol_map}")
 
-    # Processor + Redis
+    # Initialize LogProcessor (spawns producer+consumer loops)
     settings: Settings = get_settings()
     processor = LogProcessor(settings)
     await processor.setup()
     app.state.processor = processor
-    logger.info("LogProcessor ready")
+    logger.info("LogProcessor setup complete")
 
-    # FTP monitor
+    # Start FTP monitor
     # asyncio.create_task(ftp_monitor(settings))
-    # logger.info("FTP monitor launched")
+    # logger.info("FTP monitor task launched")
 
-    # File watcher
+    # Start file watcher
     watcher = FileWatcher(settings)
     await watcher.setup()
     app.state.watcher = watcher
     asyncio.create_task(watcher.watch())
-    logger.info(f"FileWatcher watching {settings.watch_dir}")
+    logger.info(f"FileWatcher watching directory: {settings.watch_dir}")
 
     yield
-    logger.info("Application shutdown…")
+    logger.info("Shutting down application…")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -52,34 +53,27 @@ async def health():
 
 @app.post("/upload")
 async def upload(
-    background: BackgroundTasks,
     file: UploadFile = File(...),
     parser: LogParser = Depends(LogParser),
     settings: Settings = Depends(get_settings),
 ):
     logger = logging.getLogger(__name__)
     try:
-        raw = await file.read()
-        text = raw.decode("utf-8")
+        text = (await file.read()).decode()
         entries = parser.parse(text)
 
+        # Push into Redis only; processor loops handle rest
         redis_svc = RedisService(settings)
         await redis_svc.connect()
         for e in entries:
             logger.debug(f"Enqueueing session={e.session}")
             await redis_svc.push(e.session, e)
 
-        background.add_task(app.state.processor.process, app.state.PORT_MAP)
-        logger.info(f"Dispatched processor for {len(entries)} entries")
-
-        return {
-            "message": "Processed and queued logs successfully",
-            "messages_processed": len(entries),
-            "unique_sessions": len({e.session for e in entries}),
-        }
-    except Exception:
-        logger.exception("Error handling /upload")
-        raise HTTPException(status_code=500, detail="Internal error")
+        logger.info(f"Received and queued {len(entries)} entries")
+        return {"queued": len(entries)}
+    except Exception as exc:
+        logger.exception("Error in /upload")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 if __name__ == "__main__":
     import uvicorn
@@ -88,5 +82,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info",
+        log_level="debug",    # ensure DEBUG logs appear
     )
