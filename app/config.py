@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # Socket retry settings
     socket_retries: int = 3
     socket_backoff: float = 1.0
+    # how many sockets may be open (and writing) at once
+    max_concurrent_sockets: int = 10
+    # minimum seconds to wait between writes _per session_
+    send_interval: float = 0.1
 
     class Config:
         env_file = ".env"
