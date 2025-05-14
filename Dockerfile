@@ -1,18 +1,26 @@
-FROM python:3.11-slim AS build
+FROM python:3.11-bullseye
 
-WORKDIR /app
-COPY pyproject.toml poetry.lock ./
-RUN pip install poetry \
- && poetry config virtualenvs.create false \
- && poetry install --no-dev --no-root
+# Install basic system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends --fix-missing \
+    build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
-FROM python:3.11-slim
+# Set working directory
 WORKDIR /app
-COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copy only the requirements file and install deps first (cache-friendly)
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the full application code
 COPY . .
 
+# Add non-root user for security
 RUN adduser --disabled-password appuser
 USER appuser
 
+# Expose the port and run app
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

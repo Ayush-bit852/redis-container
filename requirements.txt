@@ -1,8 +1,7 @@
 fastapi==0.115.12
 uvicorn==0.34.2
 python-dotenv==1.1.0
-redis==6.0.0
-pydantic==2.11.4
+redis[asyncio]==4.6.0
 pydantic==2.11.4
 pydantic-settings>=0.1.0
 python-multipart==0.0.20
